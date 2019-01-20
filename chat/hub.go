@@ -4,6 +4,9 @@
 
 package main
 
+import(
+	"github.com/rin1208/go-trace"
+)
 // Hub maintains the set of active clients and broadcasts messages to the
 // clients.
 type Hub struct {
@@ -18,6 +21,8 @@ type Hub struct {
 
 	// Unregister requests from clients.
 	unregister chan *Client
+
+	tracer trace.Tracer
 }
 
 func newHub() *Hub {
@@ -34,18 +39,23 @@ func (h *Hub) run() {
 		select {
 		case client := <-h.register:
 			h.clients[client] = true
+			h.tracer.Trace("新しいクライアントが参加したよ！")
 		case client := <-h.unregister:
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.send)
+				h.tracer.Trace("クライアントが退室したよ")
 			}
 		case message := <-h.broadcast:
+			h.tracer.Trace("メッセージを受信したよ: ", string(message))
 			for client := range h.clients {
 				select {
 				case client.send <- message:
+				h.tracer.Trace(" -- クライアントに送信されたよ ")
 				default:
 					close(client.send)
 					delete(h.clients, client)
+					h.tracer.Trace("送信に失敗したよ")
 				}
 			}
 		}
